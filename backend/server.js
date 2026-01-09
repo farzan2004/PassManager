@@ -1,52 +1,90 @@
-const express = require('express')
-require('dotenv').config()
-const { MongoClient } = require('mongodb');
-const bodyparser = require('body-parser')
-const cors = require('cors')
+const express = require('express');
+require('dotenv').config();
+const { MongoClient, ObjectId } = require('mongodb');
+const bodyparser = require('body-parser');
+const cors = require('cors');
+const { OAuth2Client } = require('google-auth-library');
 
-const url = 'mongodb://localhost:27017';
-const client = new MongoClient(url);
+const client = new MongoClient(process.env.MONGO_URI);
+const googleClient = new OAuth2Client();
 
-// Database Name
-const dbName = 'passmanager';
-client.connect();
+async function connectDB() {
+    try {
+        await client.connect();
+        console.log("✅ Connected to MongoDB");
+    } catch (err) {
+        console.error("❌ Failed to connect to MongoDB", err);
+    }
+}
+connectDB();
 
+const app = express();
+const port = 5000;
+app.use(bodyparser.json());
+app.use(cors());
 
-const app = express()
-const port = 3000
-app.use(bodyparser.json())
-app.use(cors())
+// Authenticate User
+app.post('/auth/google', async (req, res) => {
+    const { token } = req.body;
+    try {
+        const ticket = await googleClient.verifyIdToken({ idToken: token, audience: process.env.GOOGLE_CLIENT_ID });
+        const { email, name } = ticket.getPayload();
+        
+        const db = client.db(process.env.DB_NAME);
+        let user = await db.collection('users').findOne({ email });
 
-// Middleware to set db and collection
-// app.use((req, res, next) => {
-//     req.db = client.db(dbName);
-//     req.collection = req.db.collection('Credentials');
-//     next();
-// });
+        if (!user) {
+            console.log("User not found, creating new user...");
+            const newUser = { email, name };
+            const result = await db.collection('users').insertOne(newUser);
+            console.log("New user created:", result);
+            user = { _id: result.insertedId, ...newUser };
+        } else {
+            console.log("User found:", user);
+        }
 
-app.get('/', async(req, res) => {
-    const db = client.db(dbName);
-    const collection = db.collection('Credentials');
-    const findResult = await collection.find({}).toArray();
-  res.json(findResult)
-})
+        res.json({ userId: user._id, email, name });
+    } catch (err) {
+        console.error("Error during Google authentication:", err);
+        res.status(401).json({ error: 'Invalid token' });
+    }
+});
 
-app.post('/', async(req, res) => {
-    const data = req.body
-    const db = client.db(dbName);
-    const collection = db.collection('Credentials');
-    const findResult = await collection.insertOne(data);
-  res.send({success: true, result:findResult})
-})
+// Get User's Passwords
+app.get('/passwords/:userId', async (req, res) => {
+    const db = client.db(process.env.DB_NAME);
+    const passwords = await db.collection('passwords').find({ userId: req.params.userId }).toArray();
+    res.json(passwords);
+});
 
-app.delete('/', async(req, res) => {
-    const data = req.body
-    const db = client.db(dbName);
-    const collection = db.collection('Credentials');
-    const findResult = await collection.deleteOne(data);
-  res.send({success: true, result:findResult})
-})
+// Save Password
+app.post('/passwords', async (req, res) => {
+    const { userId, site, username, password } = req.body;
+    const db = client.db(process.env.DB_NAME);
+    await db.collection('passwords').insertOne({ userId, site, username, password });
+    res.json({ success: true });
+});
+
+// Delete Password
+app.delete('/passwords', async (req, res) => {
+    const { id } = req.body;
+
+    if (!ObjectId.isValid(id)) {
+        return res.status(400).json({ error: "Invalid ObjectId" });
+    }
+
+    const db = client.db(process.env.DB_NAME);
+    await db.collection('passwords').deleteOne({ _id: new ObjectId(id) });
+
+    res.json({ success: true });
+});
+
 
 app.listen(port, () => {
-  console.log(`Example app listening on port http://localhost:${port}`)
-})
+    console.log(`Server running at http://localhost:${port}`);
+});
+// //{
+//     "userId": "67cfe2116d6a5c27df1de264",
+//     "email": "farzanrashid2004@gmail.com",
+//     "name": "farzan rashid"
+// }
