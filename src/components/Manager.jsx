@@ -10,25 +10,22 @@ const Manager = () => {
     const [form, setform] = useState({ site: "", username: "", password: "" });
     const [passArray, setpassArray] = useState([]);
     const [showOptions, setShowOptions] = useState(null);
-
-    const getpasswords = async () => {
-        let req = await fetch("http://localhost:3000/")
+    const [user, setUser] = useState(null);
+    
+    const getpasswords = async (userId) => {
+        let req = await fetch(`http://localhost:5000/passwords/${userId}`);
         let passwords = await req.json();
-        console.log(passwords)
-
-        try {
-            setpassArray(passwords);
-        } catch (error) {
-            console.error("Error parsing passwords:", error);
-            setpassArray([]);
-        }
-        //you must allow cors in your backend, go through expressjs cors middleware page.
-
-    }
+        setpassArray(passwords);
+    };
     
 
     useEffect(() => {
-        getpasswords()
+        const savedUser = localStorage.getItem("user");
+        if (savedUser) {
+            const parsedUser = JSON.parse(savedUser);
+            setUser(parsedUser);
+            getpasswords(parsedUser.sub);
+        }
     }, []);
 
     useEffect(() => {
@@ -53,37 +50,34 @@ const Manager = () => {
             toast.error('Please fill in all fields before saving.', {
                 position: "top-right",
                 autoClose: 2000,
-                hideProgressBar: false,
-                closeOnClick: true,
-                pauseOnHover: true,
-                draggable: true,
-                progress: undefined,
                 theme: "colored",
             });
             return;
         }
 
-        const newPass = { ...form, id: uuidv4() };
-        const updatedPassArray = [...passArray, newPass];
-        setpassArray(updatedPassArray);
-        
-        //if any entries with same id exists in db, then delete the previous one.
-        await fetch("http://localhost:3000/",{method: "DELETE", headers: {"Content-Type": "application/json"}, 
-        body: JSON.stringify({id: form.id})})
+        let existingEntry = passArray.find(item => item.site === form.site && item.userId === user.sub);
 
-        await fetch("http://localhost:3000/",{method: "POST", headers: {"Content-Type": "application/json"}, 
-        body: JSON.stringify({ ...form, id: uuidv4() })})
+        if (existingEntry) {
+            await fetch("http://localhost:5000/passwords", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: existingEntry.id, userId: user.sub })  // Pass userId for security
+            });
+        }
 
-        toast.success('password saved.', {
+        const newPass = { ...form, id: uuidv4(), userId: user.sub };
+        setpassArray([...passArray.filter(item => item.site !== form.site), newPass]);
+
+        await fetch("http://localhost:5000/passwords", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(newPass)
+        });
+
+        toast.success('Password saved.', {
             position: "bottom-right",
-            autoClose: 2000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-            theme: "colored",
-        })
+            autoClose: 1500,
+        });
         setform({ site: "", username: "", password: "" });
     };
 
@@ -96,12 +90,6 @@ const Manager = () => {
         toast.success('Copied to clipboard', {
             position: "bottom-right",
             autoClose: 1500,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-            theme: "light",
         });
     };
 
@@ -110,23 +98,19 @@ const Manager = () => {
     };
 
     const deletepass = async (id) => {
-        let c = confirm("Please confirm to delete this password.");
+        let c = confirm("Confirm delete?");
         if (c) {
-            const updatedPassArray = passArray.filter(item => item.id !== id);
-            setpassArray(updatedPassArray);
+            setpassArray(passArray.filter(item => item.id !== id));
 
-            await fetch("http://localhost:3000/",{method: "DELETE", headers: {"Content-Type": "application/json"}, 
-            body: JSON.stringify({id})})
+            await fetch("http://localhost:5000/passwords", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id, userId: user.sub })
+            });
 
             toast.success('Password deleted.', {
                 position: "bottom-right",
                 autoClose: 1500,
-                hideProgressBar: false,
-                closeOnClick: true,
-                pauseOnHover: true,
-                draggable: true,
-                progress: undefined,
-                theme: "light",
             });
         }
     };
@@ -153,13 +137,14 @@ const Manager = () => {
                 theme="light"
                 transition:slide
             />
-            <div className="absolute inset-0 -z-10 h-full w-full bg-purple-500 [background:radial-gradient(125%_125%_at_50%_10%,#fff_40%,#63e_100%)]"></div>
+            <div className="absolute inset-0 -z-10 h-full w-full bg-purple-500 bg-[radial-gradient(circle_at_top,#fff_20%,#63e_90%)]"></div>
 
-            <div ref={contref} className='md:mycontainer bg-purple-100 mx-auto mb-3 max-w-6xl'>
+
+            <div ref={contref} className="mx-auto mb-3 max-w-6xl bg-purple-100 min-h-[500px]">
+
                 <h3 className='text-3xl font-bold text-center w-35'>
-                    <span className="text-green-800 font-extrabold">&lt;</span>
-                    <span>PassHandler</span>
-                    <span className="text-green-800 font-extrabold">/&gt;</span>
+                    <span>PassMan</span>
+                    <span className="text-green-800 font-bold">(&#183; _ &#183;)</span>
                 </h3>
                 <p className="text-green-800 text-lg text-center w-35 mt-2">Never forget a password again.</p>
 
@@ -190,7 +175,9 @@ const Manager = () => {
                     </div>
 
                     <div className="container">
-                        <h2 className='font-bold text-2xl py-3'>Credentials</h2>
+                        <h2 className='font-bold text-2xl py-3'>Credentials
+                        <span className="text-green-800 font-extrabold">&#128273;</span>
+                        </h2>
                         {passArray.length === 0 && <div>Nothing to show. Please save a password above.</div>}
 
                         {passArray.length !== 0 &&
