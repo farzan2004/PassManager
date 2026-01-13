@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
-import { v4 as uuidv4 } from 'uuid';
 import 'react-toastify/dist/ReactToastify.css';
+import Swal from "sweetalert2";
 
 const Manager = () => {
     const ref = useRef();
@@ -10,25 +10,29 @@ const Manager = () => {
     const [form, setform] = useState({ site: "", username: "", password: "" });
     const [passArray, setpassArray] = useState([]);
     const [showOptions, setShowOptions] = useState(null);
+    const [editingId, setEditingId] = useState(null);
 
     const getpasswords = async () => {
-        let req = await fetch("http://localhost:3000/")
-        let passwords = await req.json();
-        console.log(passwords)
-
-        try {
-            setpassArray(passwords);
-        } catch (error) {
-            console.error("Error parsing passwords:", error);
-            setpassArray([]);
+        let req = await fetch(`http://localhost:5000/passwords`, {
+            credentials: "include",
+        });
+        if (req.status === 401) {
+            toast.info("Session expired. Please login again.", {
+                position: "top-right",
+            });
+            return;
         }
-        //you must allow cors in your backend, go through expressjs cors middleware page.
+        if (!req.ok) {
+            toast.error("something went wrong!! We are working on it.");
+            return;
+        }
+        const passwords = await req.json();
+        setpassArray(passwords);
+    };
 
-    }
-    
 
     useEffect(() => {
-        getpasswords()
+        getpasswords();
     }, []);
 
     useEffect(() => {
@@ -49,41 +53,73 @@ const Manager = () => {
     };
 
     const savepass = async () => {
-        if (!form.site || !form.username || !form.password) {
+        if (!form.password) {
+            const confirm = await Swal.fire({
+                title: "Empty Password field!!",
+                text: "U sure want to proceed?.",
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonText: "Proceed",
+                cancelButtonText: "Cancel",
+                confirmButtonColor: "#1e763e",
+                cancelButtonColor: "#9ca3af",
+
+                background: "#e2d8fc", // 👈 modal background
+            });
+
+            if (!confirm.isConfirmed) return;
+        }
+        if (!form.site || !form.username) {
             toast.error('Please fill in all fields before saving.', {
                 position: "top-right",
                 autoClose: 2000,
-                hideProgressBar: false,
-                closeOnClick: true,
-                pauseOnHover: true,
-                draggable: true,
-                progress: undefined,
                 theme: "colored",
             });
             return;
         }
 
-        const newPass = { ...form, id: uuidv4() };
-        const updatedPassArray = [...passArray, newPass];
-        setpassArray(updatedPassArray);
-        
-        //if any entries with same id exists in db, then delete the previous one.
-        await fetch("http://localhost:3000/",{method: "DELETE", headers: {"Content-Type": "application/json"}, 
-        body: JSON.stringify({id: form.id})})
+        if (editingId) {
+            const res = await fetch(`http://localhost:5000/passwords/${editingId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(form),
+                credentials: "include",
+            });
 
-        await fetch("http://localhost:3000/",{method: "POST", headers: {"Content-Type": "application/json"}, 
-        body: JSON.stringify({ ...form, id: uuidv4() })})
+            if (!res.ok) {
+                toast.error("Update failed!");
+                return;
+            }
+            setpassArray(
+                passArray.map(item =>
+                    item._id === editingId ? { ...item, ...form } : item
+                )
+            );
 
-        toast.success('password saved.', {
-            position: "bottom-right",
-            autoClose: 2000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
+            setEditingId(null);
+        }
+
+        // CREATE MODE → INSERT
+        else {
+            const res = await fetch("http://localhost:5000/passwords", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(form),
+                credentials: "include",
+            });
+            if (!res.ok) {
+                toast.error("Update failed!! Please try again after some time.");
+                return;
+            }
+            const saved = await res.json(); // includes _id
+            setpassArray([...passArray, { ...saved, password: form.password }]);
+        }
+
+        toast.success('Password saved.', {
+            position: "top-right",
+            autoClose: 1500,
             theme: "colored",
-        })
+        });
         setform({ site: "", username: "", password: "" });
     };
 
@@ -96,12 +132,7 @@ const Manager = () => {
         toast.success('Copied to clipboard', {
             position: "bottom-right",
             autoClose: 1500,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-            theme: "light",
+            theme: "colored",
         });
     };
 
@@ -109,33 +140,49 @@ const Manager = () => {
         setShowOptions(showOptions === index ? null : index);
     };
 
-    const deletepass = async (id) => {
-        let c = confirm("Please confirm to delete this password.");
-        if (c) {
-            const updatedPassArray = passArray.filter(item => item.id !== id);
-            setpassArray(updatedPassArray);
+    const deletepass = async (_id) => {
+        const confirm = await Swal.fire({
+            title: "Delete password?",
+            text: "Are u sure u wanna delete.",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "Delete",
+            cancelButtonText: "Cancel",
+            confirmButtonColor: "#ef4444",
+            cancelButtonColor: "#9ca3af",
 
-            await fetch("http://localhost:3000/",{method: "DELETE", headers: {"Content-Type": "application/json"}, 
-            body: JSON.stringify({id})})
+            background: "#e2d8fc", // 👈 modal background
+        });
 
-            toast.success('Password deleted.', {
-                position: "bottom-right",
-                autoClose: 1500,
-                hideProgressBar: false,
-                closeOnClick: true,
-                pauseOnHover: true,
-                draggable: true,
-                progress: undefined,
-                theme: "light",
-            });
+        if (!confirm.isConfirmed) return;
+
+        const res = await fetch(`http://localhost:5000/passwords/${_id}`, {
+            method: "DELETE",
+            credentials: "include",
+        });
+        if (!res.ok) {
+            toast.error("Delete failed!! Please try again after some time.");
+            return;
         }
+        setpassArray(passArray.filter(item => item._id !== _id));
+        toast.success('Password deleted.', {
+            position: "top-right",
+            autoClose: 1500,
+            theme: "colored",
+        });
     };
 
-    const editpass = (id) => {
-        const passToEdit = passArray.find(item => item.id === id);
-        setform({...passToEdit, id: id});
-        const updatedPassArray = passArray.filter(item => item.id !== id);
-        setpassArray(updatedPassArray);
+    const editpass = (pass) => {
+        setform({
+            site: pass.site,
+            username: pass.username,
+            password: "",
+        });
+        toast.info("Editing password", {
+            position: 'top-center',
+            autoClose: 2500,
+        });
+        setEditingId(pass._id); // 🔑 tells savepass we are editing
     };
 
     return (
@@ -153,13 +200,14 @@ const Manager = () => {
                 theme="light"
                 transition:slide
             />
-            <div className="absolute inset-0 -z-10 h-full w-full bg-purple-500 [background:radial-gradient(125%_125%_at_50%_10%,#fff_40%,#63e_100%)]"></div>
+            <div className="absolute inset-0 -z-10 h-full w-full bg-purple-500 bg-[radial-gradient(circle_at_top,#fff_20%,#63e_90%)]"></div>
 
-            <div ref={contref} className='md:mycontainer bg-purple-100 mx-auto mb-3 max-w-6xl'>
+
+            <div ref={contref} className="mx-auto mb-3 max-w-[80rem] bg-purple-100 min-h-[500px]">
+
                 <h3 className='text-3xl font-bold text-center w-35'>
-                    <span className="text-green-800 font-extrabold">&lt;</span>
-                    <span>PassHandler</span>
-                    <span className="text-green-800 font-extrabold">/&gt;</span>
+                    <span>PassMan</span>
+                    <span className="text-green-800 font-bold">(&#183; _ &#183;)</span>
                 </h3>
                 <p className="text-green-800 text-lg text-center w-35 mt-2">Never forget a password again.</p>
 
@@ -167,7 +215,7 @@ const Manager = () => {
                     <input value={form.site} onChange={handlechange} placeholder='Website URL' type="text" className="rounded-full border border-green-900 w-full px-4" name='site' />
 
                     <div className="flex flex-col md:flex-row gap-5">
-                        <input value={form.username} onChange={handlechange} placeholder='Username' type="text" className="rounded-full border border-green-900 w-full px-4" name='username' />
+                        <input value={form.username} onChange={handlechange} placeholder='Username or Email' type="text" className="rounded-full border border-green-900 w-full px-4" name='username' />
 
                         <div className="relative">
                             <input ref={ref2} value={form.password} onChange={handlechange} placeholder='Password' type="password" className="rounded-full border border-green-900 w-full px-4" name='password' />
@@ -177,35 +225,49 @@ const Manager = () => {
                         </div>
                     </div>
 
-                    <div className="flex items-center w-35 justify-center">
-                        <button onClick={savepass} className="group flex items-center justify-center bg-green-400 border-2 border-green-600 rounded-full m-2 p-2 text-black hover:bg-green-500 w-24">
+                    <div className="flex flex-col items-center w-35 justify-center">
+                        <button onClick={savepass} className="group flex items-center justify-center bg-green-400 border-2 border-green-600 rounded-full m-2 p-2 text-black hover:bg-green-500 w-32">
                             <lord-icon
                                 src="https://cdn.lordicon.com/slmechys.json"
                                 trigger="loop-on-hover"
                                 className="group-hover:trigger"
                                 style={{ width: "30px", height: "30px" }}>
                             </lord-icon>
-                            Save
+                            {editingId ? "Update" : "Save"}
                         </button>
+                        {editingId && (
+                            <button
+                                className="group items-center bg-red-400 border-2 border-red-600 rounded-full m-2 p-2 text-black hover:bg-red-500 w-32"
+                                onClick={() => {
+                                    setEditingId(null);
+                                    setform({ site: "", username: "", password: "" });
+                                }}
+                            >
+                                Cancel edit
+                            </button>
+                        )}
                     </div>
 
-                    <div className="container">
-                        <h2 className='font-bold text-2xl py-3'>Credentials</h2>
+                    <div className="mx-auto max-w-6xl w-full px-2 flex flex-col justify-center">
+                        <h2 className='font-bold text-2xl py-3'>Credentials
+                            <span className="text-green-800 font-extrabold">&#128273;</span>
+                        </h2>
                         {passArray.length === 0 && <div>Nothing to show. Please save a password above.</div>}
 
                         {passArray.length !== 0 &&
-                            <table className="table-auto w-full rounded-lg overflow-hidden">
+                        <div className="w-full overflow-x-auto">
+                            <table className="table-auto w-full rounded-lg min-w-[350px]">
                                 <thead className='bg-purple-400 text-black'>
                                     <tr>
                                         <th className='my-2 py-1'>Website URL</th>
-                                        <th className='my-2 py-1'>Username</th>
+                                        <th className='my-2 py-1'>Username or Email</th>
                                         <th className='my-2 py-1'>Password</th>
                                         <th className='my-2 py-1'>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className='bg-purple-100 rounded-md overflow-hidden'>
                                     {passArray.map((item, index) => (
-                                        <tr key={item.id}>
+                                        <tr key={item._id}>
                                             <td className='text-center cursor-pointer flex items-center justify-center'>
                                                 <a href={item.site} target='_blank' rel='noopener noreferrer'>{item.site}</a>
                                                 <button className='copy' onClick={() => copytext(item.site)}>
@@ -249,8 +311,8 @@ const Manager = () => {
 
                                                 {showOptions === index && (
                                                     <div className='absolute bg-slate-100 border rounded shadow-lg'>
-                                                        <button className='block w-full text-left px-4 py-2' onClick={() => deletepass(item.id)}>Delete</button>
-                                                        <button className='block w-full text-left px-4 py-2' onClick={() => editpass(item.id)}>Edit</button>
+                                                        <button className='block w-full text-left px-4 py-2' onClick={() => deletepass(item._id)}>Delete</button>
+                                                        <button className='block w-full text-left px-4 py-2' onClick={() => editpass(item)}>Edit</button>
                                                     </div>
                                                 )}
                                             </td>
@@ -258,6 +320,7 @@ const Manager = () => {
                                     ))}
                                 </tbody>
                             </table>
+                        </div>
                         }
                     </div>
                 </div>

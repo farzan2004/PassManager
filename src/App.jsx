@@ -1,28 +1,96 @@
-import React from 'react'
-import Navbar from './components/Navbar'
-import './App.css'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom'
-import Manager from './components/Manager'
-import Footer from './components/Footer'
-import About from './components/About'
-import Contact from './components/Contact'
-
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import Navbar from './components/Navbar';
+import Footer from './components/Footer';
+import Manager from './components/Manager';
+import Contact from './components/Contact';
+import Login from './components/Login';
+import Profile from './components/Profile'; // Import Profile
 
 function App() {
-  return (
-    <Router>
-      <Navbar />
-      <div className='min-h-[90vh]'>
-      {/* <Manager /> */}
-        <Routes>
-          <Route path="/" element={<Manager/>} />
-          <Route path="/about" element={<About/>} />
-          <Route path="/contact" element={<Contact/>} />
-        </Routes>
-      </div>
-      <Footer />
-    </Router>
-  )
+    const [loading, setLoading] = useState(true);
+    const [isAuth, setIsAuth] = useState(false);
+    const [user, setUser] = useState(null);
+
+    useEffect(() => {
+        fetch("http://localhost:5000/auth/me", {
+            credentials: "include",
+        })
+            .then(async res => {
+                if (!res.ok) throw new Error("Not authenticated");
+                const data = await res.json();
+                setUser(data.user);
+                setIsAuth(true);
+            }).catch(() => {
+                setUser(null);
+                setIsAuth(false);
+            })
+            .finally(() => setLoading(false));
+    }, []);
+
+    if (loading) {
+        return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    }
+
+    return (
+        <Router>
+            <Routes>
+                {/* Login Page (only accessible if not logged in) */}
+                <Route
+                    path="/login" 
+                    element={
+                        !isAuth ? (
+                            <Login setUser={setUser} setIsAuth={setIsAuth} />
+                        ) : (
+                            <Navigate to="/manager" />
+                        )
+                    }
+                />
+                <Route
+                    path="/" 
+                    element={
+                        !isAuth ? (
+                            <Login setUser={setUser} setIsAuth={setIsAuth} />
+                        ) : (
+                            <Navigate to="/manager" />
+                        )
+                    }
+                />
+                {/* Protected Routes */}
+                <Route
+                    path="/*"
+                    element={
+                        <ProtectedRoute
+                            isAuth={isAuth}
+                            user={user}
+                            setUser={setUser}
+                            setIsAuth={setIsAuth}
+                        />
+                    }
+                />
+            </Routes>
+        </Router>
+    );
 }
 
-export default App
+const ProtectedRoute = ({ isAuth, user, setUser, setIsAuth }) => {
+    if (!isAuth) return <Navigate to="/login" />;
+    return (
+        <>
+            <Navbar user={user} setUser={setUser} />
+            <div className='min-h-[90vh]'>
+                <Routes>
+                    <Route path="/manager" element={<Manager />} />
+                    <Route path="/contact" element={<Contact />} />
+                    <Route
+                        path="/profile"
+                        element={<Profile user={user} setUser={setUser} setIsAuth={setIsAuth} />}
+                    />
+                </Routes>
+            </div>
+            <Footer />
+        </>
+    );
+};
+
+export default App;
