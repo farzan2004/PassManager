@@ -11,14 +11,17 @@ const Manager = () => {
     const [passArray, setpassArray] = useState([]);
     const [showOptions, setShowOptions] = useState(null);
     const [editingId, setEditingId] = useState(null);
+    const [search, setSearch] = useState("");
+    const optionsRef = useRef(null);
 
-    const getpasswords = async () => {
-        let req = await fetch(`http://localhost:5000/passwords`, {
-            credentials: "include",
-        });
+    const getpasswords = async (query = "") => {
+        let req = await fetch(
+            `${import.meta.env.VITE_BACKEND_URL}/passwords?search=${encodeURIComponent(query)}`,
+            { credentials: "include" }
+        );
         if (req.status === 401) {
             toast.info("Session expired. Please login again.", {
-                position: "top-right",
+                position: "top-cemter",
             });
             return;
         }
@@ -30,17 +33,22 @@ const Manager = () => {
         setpassArray(passwords);
     };
 
-
-    useEffect(() => {
-        getpasswords();
-    }, []);
-
     useEffect(() => {
         const contheight = contref.current.scrollHeight + 120;
         contref.current.style.height = `${contheight}px`
     }, [passArray])
 
-
+    const handleSearch = () => {
+        if (!search.trim()){
+            toast.info("Empty Search!! Try searching a website name or a username.", {
+                position: "top-center",
+                autoClose: 2500,
+            })
+            setpassArray([]);
+            return;
+        } 
+        getpasswords(search);
+    };
 
     const showpass = () => {
         if (ref.current.src.includes("icons/eyecross.png")) {
@@ -79,7 +87,7 @@ const Manager = () => {
         }
 
         if (editingId) {
-            const res = await fetch(`http://localhost:5000/passwords/${editingId}`, {
+            const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/passwords/${editingId}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(form),
@@ -101,7 +109,7 @@ const Manager = () => {
 
         // CREATE MODE → INSERT
         else {
-            const res = await fetch("http://localhost:5000/passwords", {
+            const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/passwords`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(form),
@@ -154,9 +162,12 @@ const Manager = () => {
             background: "#e2d8fc", // 👈 modal background
         });
 
-        if (!confirm.isConfirmed) return;
+        if (!confirm.isConfirmed){
+            setShowOptions(null);
+            return;
+        }
 
-        const res = await fetch(`http://localhost:5000/passwords/${_id}`, {
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/passwords/${_id}`, {
             method: "DELETE",
             credentials: "include",
         });
@@ -170,6 +181,7 @@ const Manager = () => {
             autoClose: 1500,
             theme: "colored",
         });
+        setShowOptions(null);
     };
 
     const editpass = (pass) => {
@@ -183,6 +195,7 @@ const Manager = () => {
             autoClose: 2500,
         });
         setEditingId(pass._id); // 🔑 tells savepass we are editing
+        setShowOptions(null);
     };
 
     return (
@@ -203,7 +216,7 @@ const Manager = () => {
             <div className="absolute inset-0 -z-10 h-full w-full bg-purple-500 bg-[radial-gradient(circle_at_top,#fff_20%,#63e_90%)]"></div>
 
 
-            <div ref={contref} className="mx-auto mb-3 max-w-[80rem] bg-purple-100 min-h-[500px]">
+            <div ref={contref} className="mx-auto mb-3 rounded-3xl max-w-[80rem] bg-purple-100 min-h-[500px]">
 
                 <h3 className='text-3xl font-bold text-center w-35'>
                     <span>PassMan</span>
@@ -248,79 +261,97 @@ const Manager = () => {
                         )}
                     </div>
 
-                    <div className="mx-auto max-w-6xl w-full px-2 flex flex-col justify-center">
-                        <h2 className='font-bold text-2xl py-3'>Credentials
-                            <span className="text-green-800 font-extrabold">&#128273;</span>
-                        </h2>
-                        {passArray.length === 0 && <div>Nothing to show. Please save a password above.</div>}
+                    <div className="max-w-6xl w-full px-3 flex flex-col justify-start">
+                        <div className='flex md:flex-row flex-col md:gap-12 gap-1 my-3 justify-start items-center'>
+                            <h2 className='font-semibold text-2xl py-3'>Credentials
+                                {/* <span className="text-green-800 font-medium md:font-extrabold">&#128273;</span> */}
+                            </h2>
+                            <div className='flex justify-between items-center gap-2 rounded-full border border-green-900 bg-green-50 px-2 w-[16rem]'>
+                                <input
+                                    type="text" placeholder="Search by site or username" value={search}
+                                    onChange={(e) => {
+                                        const value = e.target.value; setSearch(value);
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                            handleSearch();
+                                        }
+                                    }}
+                                    className="bg-transparent outline-none w-full md:text-sm text-xs placeholder:text-green-700"
+                                />
+                                <button onClick={handleSearch}
+                                    className="text-green-700 text-base hover:scale-125 hover:opacity-100 opacity-90">🔍</button>
+                            </div>
+                        </div>
+                        {passArray.length === 0 && <div>Nothing to show. Try searching for a saved password or saving one.</div>}
 
                         {passArray.length !== 0 &&
-                        <div className="w-full overflow-x-auto">
-                            <table className="table-auto w-full rounded-lg min-w-[350px]">
-                                <thead className='bg-purple-400 text-black'>
-                                    <tr>
-                                        <th className='my-2 py-1'>Website URL</th>
-                                        <th className='my-2 py-1'>Username or Email</th>
-                                        <th className='my-2 py-1'>Password</th>
-                                        <th className='my-2 py-1'>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className='bg-purple-100 rounded-md overflow-hidden'>
-                                    {passArray.map((item, index) => (
-                                        <tr key={item._id}>
-                                            <td className='text-center cursor-pointer flex items-center justify-center'>
-                                                <a href={item.site} target='_blank' rel='noopener noreferrer'>{item.site}</a>
-                                                <button className='copy' onClick={() => copytext(item.site)}>
-                                                    <lord-icon
-                                                        src="https://cdn.lordicon.com/depeqmsz.json"
-                                                        trigger="hover"
-                                                        style={{ width: "14px", height: "14px" }}>
-                                                    </lord-icon>
-                                                </button>
-                                            </td>
-
-
-                                            <td className='text-center cursor-pointer'>
-                                                {item.username}
-                                                <button className='copy' onClick={() => copytext(item.username)}>
-                                                    <lord-icon
-                                                        src="https://cdn.lordicon.com/depeqmsz.json"
-                                                        trigger="hover"
-                                                        style={{ width: "14px", height: "14px" }}>
-                                                    </lord-icon>
-                                                </button>
-                                            </td>
-
-
-                                            <td className='text-center cursor-pointer'>
-                                                {"*".repeat(item.password.length)}
-                                                <button className='copy' onClick={() => copytext(item.password)}>
-                                                    <lord-icon
-                                                        src="https://cdn.lordicon.com/depeqmsz.json"
-                                                        trigger="hover"
-                                                        style={{ width: "14px", height: "14px" }}>
-                                                    </lord-icon>
-                                                </button>
-                                            </td>
-
-
-                                            <td className='text-center cursor-pointer'>
-                                                <button className='w-8 h-4' onClick={() => options(index)}>
-                                                    <img src="icons/option.svg" alt="options" />
-                                                </button>
-
-                                                {showOptions === index && (
-                                                    <div className='absolute bg-slate-100 border rounded shadow-lg'>
-                                                        <button className='block w-full text-left px-4 py-2' onClick={() => deletepass(item._id)}>Delete</button>
-                                                        <button className='block w-full text-left px-4 py-2' onClick={() => editpass(item)}>Edit</button>
-                                                    </div>
-                                                )}
-                                            </td>
+                            <div className="w-full overflow-x-auto">
+                                <table className="table-auto w-full rounded-3xl min-w-[350px]">
+                                    <thead className='bg-purple-400 rounded-xl text-black'>
+                                        <tr>
+                                            <th className='my-2 py-1'>Website URL</th>
+                                            <th className='my-2 py-1'>Username or Email</th>
+                                            <th className='my-2 py-1'>Password</th>
+                                            <th className='my-2 py-1'>Actions</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                    </thead>
+                                    <tbody className='bg-purple-100 rounded-md overflow-hidden'>
+                                        {passArray.map((item, index) => (
+                                            <tr key={item._id}>
+                                                <td className='text-center cursor-pointer flex items-center justify-center'>
+                                                    <a href={item.site} target='_blank' rel='noopener noreferrer'>{item.site}</a>
+                                                    <button className='copy' onClick={() => copytext(item.site)}>
+                                                        <lord-icon
+                                                            src="https://cdn.lordicon.com/depeqmsz.json"
+                                                            trigger="hover"
+                                                            style={{ width: "14px", height: "14px" }}>
+                                                        </lord-icon>
+                                                    </button>
+                                                </td>
+
+
+                                                <td className='text-center cursor-pointer'>
+                                                    {item.username}
+                                                    <button className='copy' onClick={() => copytext(item.username)}>
+                                                        <lord-icon
+                                                            src="https://cdn.lordicon.com/depeqmsz.json"
+                                                            trigger="hover"
+                                                            style={{ width: "14px", height: "14px" }}>
+                                                        </lord-icon>
+                                                    </button>
+                                                </td>
+
+
+                                                <td className='text-center cursor-pointer'>
+                                                    {"*".repeat(item.password.length)}
+                                                    <button className='copy' onClick={() => copytext(item.password)}>
+                                                        <lord-icon
+                                                            src="https://cdn.lordicon.com/depeqmsz.json"
+                                                            trigger="hover"
+                                                            style={{ width: "14px", height: "14px" }}>
+                                                        </lord-icon>
+                                                    </button>
+                                                </td>
+
+
+                                                <td className='text-center cursor-pointer' ref={optionsRef}>
+                                                    <button className='w-8 h-4' onClick={() => options(index)}>
+                                                        <img src="icons/option.svg" alt="options" />
+                                                    </button>
+
+                                                    {showOptions === index && (
+                                                        <div className='absolute bg-slate-100 border rounded shadow-lg'>
+                                                            <button className='block w-full text-left px-4 py-2' onClick={() => deletepass(item._id)}>Delete</button>
+                                                            <button className='block w-full text-left px-4 py-2' onClick={() => editpass(item)}>Edit</button>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         }
                     </div>
                 </div>

@@ -22,7 +22,7 @@ const Profile = ({ user, setIsAuth }) => {
 
         if (!confirm.isConfirmed) return;
 
-        await fetch("http://localhost:5000/auth/logout", {
+        await fetch(`${import.meta.env.VITE_BACKEND_URL}/auth/logout`, {
             method: "POST",
             credentials: "include",
         });
@@ -32,7 +32,8 @@ const Profile = ({ user, setIsAuth }) => {
     };
 
     return (
-        <div className='flex justify-center flex-col items-center align-middle [background:radial-gradient(125%_125%_at_50%_10%,#fff_40%,#63e_100%)] w-full min-h-screen'>
+        // <div className='flex justify-center flex-col items-center align-middle [background:radial-gradient(125%_125%_at_50%_10%,#fff_40%,#63e_100%)] w-full'>
+        <div className="relative min-h-screen flex justify-center items-center">
             <ToastContainer
                     position="top-right"
                     autoClose={2500}
@@ -41,8 +42,9 @@ const Profile = ({ user, setIsAuth }) => {
                     closeOnClick
                     pauseOnHover
                     theme="colored"
-                  />
-            <div className='rounded-full h-[27rem] w-[27rem] flex flex-col gap-2 justify-center items-center bg-purple-200'>
+                />
+                <div className="absolute inset-0 -z-10 h-full w-full bg-purple-500 bg-[radial-gradient(circle_at_top,#fff_20%,#63e_90%)]"></div>
+            <div className='rounded-full md:h-[27rem] md:w-[27rem] h-[21rem] w-[21rem] flex flex-col gap-2 justify-center items-center bg-purple-200 text-center'>
                 <h2 className="text-xl font-bold">{user?.name}</h2>
                 <p className="text-gray-600 font-semibold">{user?.email}</p>
 

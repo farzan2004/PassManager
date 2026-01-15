@@ -229,13 +229,40 @@ app.post("/auth/logout", (req, res) => {
 });
 
 // Get passwords
+// app.get("/passwords", authMiddleware, async (req, res) => {
+//     const db = client.db(process.env.DB_NAME);
+//     const userId = req.user.userId;
+
+//     const records = await db
+//         .collection("passwords")
+//         .find({ userId })
+//         .toArray();
+
+//     const decrypted = records.map(item => ({
+//         ...item,
+//         password: decrypt(item.password),
+//     }));
+
+//     res.json(decrypted);
+// });
+
 app.get("/passwords", authMiddleware, async (req, res) => {
     const db = client.db(process.env.DB_NAME);
     const userId = req.user.userId;
 
+    const search = req.query.search || "";
+
+    const filter = {
+        userId,
+        $or: [
+            { site: { $regex: search, $options: "i" } },
+            { username: { $regex: search, $options: "i" } }
+        ]
+    };
+
     const records = await db
         .collection("passwords")
-        .find({ userId })
+        .find(filter)
         .toArray();
 
     const decrypted = records.map(item => ({
