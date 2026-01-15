@@ -15,13 +15,13 @@ import { authMiddleware } from "./middlewares/authMiddleware.js";
 dotenv.config();
 
 const app = express();
-const port = 5000;
+const port = process.env.PORT || 5000;
 
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(
     cors({
-        origin: "http://localhost:5173",
+        origin: process.env.CLIENT_URL,
         credentials: true,
     })
 );
@@ -34,8 +34,8 @@ const client = new MongoClient(process.env.MONGO_URI);
         });
         console.log("✅ MongoDB connected");
 
-        app.listen(5000, () => {
-            console.log("🚀 Server running on port 5000");
+        app.listen(port, () => {
+            console.log("🚀 Server running on port", port);
         });
     } catch (err) {
         console.error("❌ DB connection failed", err);
@@ -115,7 +115,7 @@ app.post("/auth/signup", async (req, res) => {
             res.cookie("token", jwtToken, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === "production",
-                sameSite: "strict",
+                sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
             });
 
             return res.status(201).json({
