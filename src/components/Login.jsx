@@ -30,7 +30,7 @@ const Login = ({ setUser, setIsAuth }) => {
             return;
         }
         try {
-            const res = await fetch("http://localhost:5000/auth/signup", {
+            const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/auth/signup`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
@@ -66,7 +66,7 @@ const Login = ({ setUser, setIsAuth }) => {
     // -------- GOOGLE LOGIN --------
     const handleLoginGoogle = async (credentialResponse) => {
         try {
-            const res = await fetch("http://localhost:5000/auth/login", {
+            const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/auth/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
@@ -78,7 +78,7 @@ const Login = ({ setUser, setIsAuth }) => {
 
             if (!res.ok) throw new Error("Google login failed");
 
-            const me = await fetch("http://localhost:5000/auth/me", {
+            const me = await fetch(`${import.meta.env.VITE_BACKEND_URL}/auth/me`, {
                 credentials: "include",
             });
 
@@ -100,7 +100,7 @@ const Login = ({ setUser, setIsAuth }) => {
         setLoading(true);
 
         try {
-            const res = await fetch("http://localhost:5000/auth/login", {
+            const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/auth/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
@@ -116,7 +116,7 @@ const Login = ({ setUser, setIsAuth }) => {
                 throw new Error("Login failed");
             }
 
-            const me = await fetch("http://localhost:5000/auth/me", {
+            const me = await fetch(`${import.meta.env.VITE_BACKEND_URL}/auth/me`, {
                 credentials: "include",
             });
 

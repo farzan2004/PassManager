@@ -1,7 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
-import { MongoClient, ObjectId } from "mongodb";
 import bodyParser from "body-parser";
+import { MongoClient, ObjectId } from "mongodb";
 import mongoose from "mongoose";
 import cors from "cors";
 import { User } from "./schemas/userModel.js";
@@ -227,24 +227,6 @@ app.post("/auth/logout", (req, res) => {
     });
     res.json({ success: true });
 });
-
-// Get passwords
-// app.get("/passwords", authMiddleware, async (req, res) => {
-//     const db = client.db(process.env.DB_NAME);
-//     const userId = req.user.userId;
-
-//     const records = await db
-//         .collection("passwords")
-//         .find({ userId })
-//         .toArray();
-
-//     const decrypted = records.map(item => ({
-//         ...item,
-//         password: decrypt(item.password),
-//     }));
-
-//     res.json(decrypted);
-// });
 
 app.get("/passwords", authMiddleware, async (req, res) => {
     const db = client.db(process.env.DB_NAME);
