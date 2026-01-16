@@ -13,7 +13,7 @@ function App() {
     const [user, setUser] = useState(null);
 
     useEffect(() => {
-        fetch("http://localhost:5000/auth/me", {
+        fetch(`${import.meta.env.VITE_BACKEND_URL}/auth/me`, {
             credentials: "include",
         })
             .then(async res => {
