@@ -214,11 +214,7 @@ app.post("/auth/login", async (req, res) => {
 
 app.post("/auth/logout", (req, res) => {
     console.log("Log out endpoint hit.")
-    res.clearCookie("token", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-    });
+    res.clearCookie("token", cookieConfig);
     res.json({ success: true });
 });
 
