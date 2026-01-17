@@ -216,7 +216,7 @@ const Manager = () => {
             <div className="absolute inset-0 -z-10 h-full w-full bg-purple-500 bg-[radial-gradient(circle_at_top,#fff_20%,#63e_90%)]"></div>
 
 
-            <div ref={contref} className="mx-auto mb-3 rounded-3xl max-w-[80rem] bg-purple-100 min-h-[500px]">
+            <div ref={contref} className="mx-auto mb-3 rounded-3xl max-w-[80rem] bg-purple-100 min-h-[90vh] max-h-[100vh]">
 
                 <h3 className='text-3xl font-bold text-center w-35'>
                     <span>PassMan</span>

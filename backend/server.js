@@ -57,6 +57,13 @@ app.get("/auth/me", authMiddleware, async (req, res) => {
     });
 });
 
+const cookieConfig = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+  path: "/",
+};
+
 // SignUp
 app.post("/auth/signup", async (req, res) => {
     try {
@@ -112,12 +119,7 @@ app.post("/auth/signup", async (req, res) => {
                 { expiresIn: "7d" }
             );
 
-            res.cookie("token", jwtToken, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === "production",
-                sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-            });
-
+            res.cookie("token", jwtToken, cookieConfig);
             return res.status(201).json({
                 userId: user._id,
                 email: user.email,
@@ -166,11 +168,7 @@ app.post("/auth/login", async (req, res) => {
                 { expiresIn: "7d" }
             );
 
-            res.cookie("token", jwtToken, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === "production",
-                sameSite: "strict",
-            });
+            res.cookie("token", jwtToken, cookieConfig);
 
             return res.json({
                 name: user.name,
@@ -199,11 +197,7 @@ app.post("/auth/login", async (req, res) => {
                 process.env.JWT_SECRET,
                 { expiresIn: "7d" }
             );
-            res.cookie("token", jwtToken, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === "production",
-                sameSite: "strict",
-            });
+            res.cookie("token", jwtToken, cookieConfig);
             return res.json({
                 name: user.name,
                 email: user.email,
